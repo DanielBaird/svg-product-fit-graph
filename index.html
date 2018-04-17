@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<style>
+		html, body { 
+			background-color: #ddd;
+			font-family: sans-serif; 
+		}
+		.diagram {
+			width: 80%;
+			margin: 10px 10%;
+			height: 450px;
+			background: white;
+			fill: steelblue;
+		}
+		.data {
+			box-sizing: border-box;
+			width: 80%;
+			margin: 10px auto;
+			background: #f8f8f8;
+			padding: 1em;
+		}
+	</style>
+</head>
+<body>
+
+<svg class="diagram"></svg>
+<pre class="data">
+</pre>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+info = {
+	stages: [
+		'collecting',
+		'analysing',
+		'publishing',
+		'archiving'
+	], // /stages
+
+	products: [
+		{	name: 'RDSI',
+			size: [100000000, 'many Tb'],
+			startAt: 'analysing',
+			endAt: 'archiving',
+		},
+		{	name: 'Dropbox',
+			size: [2000, '2 Gb'],
+			startAt: 'collecting',
+			endAt: 'publishing',
+		},
+		{
+			name: 'USB device',
+			size: [256000, '256 Gb'],
+			startAt: 'collecting',
+			endAt: 'analysing',
+		},
+		{
+			name: 'Redbox',
+			size: [500, '< 1 Gb'],
+			startAt: 'publishing',
+			endAt: 'archiving',
+		}
+	] // /products
+}
+
+
+// process data to get an ordered list of sizes
+var sizesList = info.products.sort(function(p1, p2) {
+	return (p2.size[0] - p1.size[0])
+}).map(function(p) { return p.size[1] })
+
+
+// start drawing it..
+var cfg = {
+	top: 50,
+	right: 50, 
+	bottom: 50, 
+	left: 120,
+
+	axisPad: 80,
+
+	barHeight: 35,
+	endRadius: 25,
+	innerRadiusRatio: 0.4,
+
+	textSize: 25,
+}
+
+var svg = d3.select(".diagram")
+var bounds = svg.node().getBoundingClientRect()
+
+var width = Math.round(bounds.width) - cfg.left - cfg.right - cfg.axisPad
+var height = Math.round(bounds.height) - cfg.top - cfg.bottom - cfg.axisPad
+var diagram = svg.append("g")
+	.attr("transform", "translate(" + cfg.left + "," + cfg.top + ")")
+
+var maxSize = 0
+info.products.forEach(function(p) {
+	maxSize = Math.max(maxSize, p.size[0])
+})
+
+// scale for the stages of data use
+var stageScale = d3.scalePoint()
+	.range([cfg.axisPad, width])
+	.domain(info.stages)
+
+// scale for the sizes
+var sizeScale = d3.scalePoint()
+	.range([0, height])
+	.domain(sizesList)
+
+
+// add the axes
+d3.axisBottom().scale(stageScale)(
+	diagram.append('g')
+		.attr('transform', 'translate(0,' + (height + cfg.axisPad) + ')')
+		.attr('style', 'font-size: ' + cfg.textSize)
+)
+d3.axisLeft().scale(sizeScale)(
+	diagram.append('g')
+		.attr('style', 'font-size: ' + cfg.textSize)
+)
+
+//
+// add the products
+//
+
+var products = diagram.selectAll('.product')
+	.data(info.products)
+	.enter().append('g')
+		.attr('class', 'product')
+
+// the connecting bar
+products.append('rect')
+	.attr('x', function(p) { return stageScale(p.startAt) })
+	.attr('y', function(p) { return sizeScale(p.size[1]) - (cfg.barHeight/2) })
+	.attr('height', cfg.barHeight)
+	.attr('width', function(p) { return stageScale(p.endAt) - stageScale(p.startAt) })
+
+// the starting dot
+products.append('circle')
+	.attr('cx', function(p) { return stageScale(p.startAt) })
+	.attr('cy', function(p) { return sizeScale(p.size[1]) })
+	.attr('r', cfg.endRadius)
+
+// the starting dot's hole
+products.append('circle')
+	.attr('cx', function(p) { return stageScale(p.startAt) })
+	.attr('cy', function(p) { return sizeScale(p.size[1]) })
+	.attr('fill', 'white')
+	.attr('r', cfg.endRadius * cfg.innerRadiusRatio)
+
+// the ending dot
+products.append('circle')
+	.attr('cx', function(p) { return stageScale(p.endAt) })
+	.attr('cy', function(p) { return sizeScale(p.size[1]) })
+	.attr('r', cfg.endRadius)
+
+// the ending dot's hole
+products.append('circle')
+	.attr('cx', function(p) { return stageScale(p.endAt) })
+	.attr('cy', function(p) { return sizeScale(p.size[1]) })
+	.attr('fill', 'white')
+	.attr('r', cfg.endRadius * cfg.innerRadiusRatio)
+
+// the name
+products.append('text')
+	.attr('height', cfg.barHeight)
+	.attr('text-anchor', 'middle')
+	.attr('fill', 'white')
+	.attr('x', function(p) { 
+		return stageScale(p.startAt) + (stageScale(p.endAt) - stageScale(p.startAt))/2
+	})
+	.attr('y', function(p) { return sizeScale(p.size[1]) + cfg.textSize/3 })
+	.attr('font-size', cfg.textSize)
+	.text(function(p) { return p.name })
+
+
+
+// that's the diagram drawn, now for the viewer's conveninence,
+// show the data used in the page's pre tag.
+d3.select('.data').node().innerHTML = JSON.stringify(info, null, 4)
+	// this replace just compacts the "size" array a bit 
+	.replace(/"size": \[\n\s*(\w*),\n\s*([^\n]+)\n\s*]/gm, '"size": [$1, $2]')
+
+
+
+</script>
+
+</body>
+</html>
